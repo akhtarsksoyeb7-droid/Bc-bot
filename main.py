@@ -2,7 +2,8 @@ import threading, time, requests
 from flask import Flask
 from collections import deque
 
-TOKEN = "8782432244:AAFVJ-6YbM6OUpY_7mABBmpi0SobEG1f_po"
+import os
+BOT_TOKEN = os.getenv("BOT_TOKEN")
 CHAT_ID = "6601590106"
 
 app = Flask(__name__)
