@@ -1,49 +1,45 @@
 import time, requests
 from flask import Flask
 import threading
-from datetime import datetime
+from concurrent.futures import ThreadPoolExecutor
 
 TOKEN = "8782432244:AAFVJ-6YbM6OUpY_7mABBmpi0SobEG1f_po"
 CHAT_ID = "6601590106"
 
 app = Flask(__name__)
 @app.route('/')
-def home(): return "UP-DOWN Bot Live"
+def home(): return "UP-DOWN Fast Live"
 
 def send(m):
     try: requests.post(f"https://api.telegram.org/bot{TOKEN}/sendMessage", data={"chat_id": CHAT_ID, "text": m, "parse_mode": "Markdown"}, timeout=10)
     except: pass
 
-# --- তোমার নতুন ভালো get_price() টা ---
+def fetch(url):
+    try: return float(requests.get(url, timeout=3).json().get('price') or requests.get(url, timeout=3).json()['data']['amount'])
+    except: return None
+
 def get_price():
     try:
-        b = float(requests.get("https://data-api.binance.vision/api/v3/ticker/price?symbol=BTCUSDT", timeout=5).json()['price'])
-        c = float(requests.get("https://api.coinbase.com/v2/prices/BTC-USD/spot", timeout=5).json()['data']['amount'])
-        avg = (b + c) / 2
-        return avg
-    except:
-        return None
+        with ThreadPoolExecutor(max_workers=2) as ex:
+            b = ex.submit(lambda: float(requests.get("https://data-api.binance.vision/api/v3/ticker/price?symbol=BTCUSDT", timeout=3).json()['price']))
+            c = ex.submit(lambda: float(requests.get("https://api.coinbase.com/v2/prices/BTC-USD/spot", timeout=3).json()['data']['amount']))
+            bv = b.result(); cv = c.result()
+            if bv and cv: return (bv+cv)/2
+            return bv or cv
+    except: return None
 
 def loop():
-    send("✅ *UP-DOWN Bot Start with Avg Price*\nEbar BC Game er sathe dam milbe")
-    last_price = get_price()
-    
+    send("✅ *Fast Bot Start - Late Fix*")
+    last = get_price()
     while True:
         curr = get_price()
-        if not curr or not last_price:
-            time.sleep(2)
-            continue
-            
-        diff = curr - last_price
-        
-        if diff > 0.5: # 0.5$ er beshi barle UP
-            send(f"🟢 *UP* `{last_price:.2f}` -> `{curr:.2f}` `+{diff:.2f}`")
-            last_price = curr
-        elif diff < -0.5: # 0.5$ er beshi komle DOWN
-            send(f"🔴 *DOWN* `{last_price:.2f}` -> `{curr:.2f}` `{diff:.2f}`")
-            last_price = curr
-            
-        time.sleep(3) # 3 sec por por check
+        if not curr or not last: time.sleep(1); continue
+        diff = curr-last
+        if abs(diff) > 0.5:
+            icon = "🟢 UP" if diff>0 else "🔴 DOWN"
+            send(f"{icon} `{last:.2f}` -> `{curr:.2f}`")
+            last = curr
+        time.sleep(2)
 
 threading.Thread(target=loop, daemon=True).start()
 if __name__ == "__main__":
