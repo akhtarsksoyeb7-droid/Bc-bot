@@ -6,45 +6,39 @@ CHAT_ID = "6601590106"
 
 app = Flask(__name__)
 @app.route('/')
-def home(): return "BC Original WS Live - Running"
+def home():
+    return "Running"
 
 def send(m):
     try:
-        requests.post(f"https://api.telegram.org/bot{TOKEN}/sendMessage", 
-        data={"chat_id": CHAT_ID, "text": m, "parse_mode": "Markdown"}, timeout=5)
-    except: pass
+        requests.post(f"https://api.telegram.org/bot{TOKEN}/sendMessage", data={"chat_id": CHAT_ID, "text": m}, timeout=5)
+    except:
+        pass
 
 last_price = 0
-start_price = 0
-round_start = time.time()
-
 def on_message(ws, message):
-    global last_price, start_price, round_start
+    global last_price
     try:
-        d = json.loads(message)
-        curr = float(d['p']) # trade price
+        data = json.loads(message)
+        if 'p' in data:
+            curr = float(data['p'])
+            if last_price != 0 and abs(curr - last_price) >= 0.5:
+                icon = "🟢 UP" if curr > last_price else "🔴 DOWN"
+                send(f"{icon} {last_price:.2f} -> {curr:.2f}")
+            last_price = curr
+    except:
+        pass
 
-        # 15 sec por por new round
-        if time.time() - round_start >= 15:
-            round_start = time.time()
-            start_price = curr
-            send(f"🆕 *NEW ROUND*\n`{curr:.2f}`")
-
-        if last_price != 0:
-            diff = curr - last_price
-            if abs(diff) >= 0.25: # 0.25$ নড়লেই signal
-                icon = "🟢 UP" if diff > 0 else "🔴 DOWN"
-                sec = int(time.time() - round_start)
-                trend = "UP" if curr > start_price else "DOWN"
-                send(f"{icon} `{last_price:.2f}` -> `{curr:.2f}`\n⏱ {sec}/15s | Trend: {trend}")
-
-        last_price = curr
-    except: pass
-
-def on_open(ws):
-    send("✅ *WS Connected - 0 Delay Live*")
-
-def run_ws():
+def start_ws():
     while True:
         try:
+            ws = websocket.WebSocketApp("wss://stream.binance.com:9443/ws/btcusdt@trade", on_message=on_message)
+            ws.run_forever(ping_interval=20)
+        except:
+            time.sleep(2)
+
+threading.Thread(target=start_ws, daemon=True).start()
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=10000)
            
