@@ -3,7 +3,7 @@ import time
 import requests
 
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
-CHAT_ID = os.environ.get("6601590106"
+CHAT_ID = "6601590106"
 
 last_price = None
 
