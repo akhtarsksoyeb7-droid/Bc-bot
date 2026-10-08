@@ -1,64 +1,35 @@
+import os
+import asyncio
+from telegram import Bot
 from flask import Flask
-from threading import Thread
-import os, time, requests
+import threading
 
-app = Flask('')
-@app.route('/')
-def home(): return "BC.Game 5s Bot Live"
-
+# Render theke Token ar Chat ID nibe
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
-CHAT_ID = os.environ.get("CHAT_ID")
+CHAT_ID = os.environ.get("CHAT_ID") # Tomar Group ID: -100xxxxxx
 
-OFFSET = -70.0 # তোমার জন্য -70 করে দিলাম, এতে BC.Game এর সাথে মিলে যাবে
+app = Flask(__name__)
+bot = Bot(token=BOT_TOKEN)
 
-def send_telegram(text):
-    try:
-        url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-        requests.post(url, json={"chat_id": CHAT_ID, "text": text}, timeout=10)
-    except: pass
+@app.route('/')
+def home():
+    return "JOJO Bot is Running!"
 
-def get_price():
-    headers = {"User-Agent": "Mozilla/5.0"}
-    sources = [
-        ("bybit", "https://api.bybit.com/v5/market/tickers?category=spot&symbol=BTCUSDT", lambda j: float(j['result']['list'][0]['lastPrice'])),
-        ("okx", "https://www.okx.com/api/v5/market/ticker?instId=BTC-USDT", lambda j: float(j['data'][0]['last'])),
-        ("binance", "https://data-api.binance.vision/api/v3/ticker/price?symbol=BTCUSDT", lambda j: float(j['price'])),
-    ]
-    for name, url, parser in sources:
-        try:
-            r = requests.get(url, timeout=5, headers=headers)
-            if r.status_code == 200:
-                return parser(r.json()) + OFFSET
-        except: pass
-    return None
-
-def bot_loop():
-    send_telegram("BC.Game Bot ON ✅\nOffset -70 applied, now price will match")
+async def send_signal():
     while True:
         try:
-            start_price = get_price()
-            if not start_price:
-                time.sleep(2)
-                continue
-            time.sleep(5)
-            end_price = get_price()
-            if not end_price: end_price = start_price
-            diff = end_price - start_price
-
-            if diff > 0:
-                msg = f"🟢 UP ⬆️\n{start_price:.2f} -> {end_price:.2f}"
-            elif diff < 0:
-                msg = f"🔴 DOWN ⬇️\n{start_price:.2f} -> {end_price:.2f}"
-            else:
-                msg = f"⚪ SAME {start_price:.2f}"
-
-            print(msg)
-            send_telegram(msg)
+            # BC GAME er direct dam ekhane asbe
+            message = "🚀 BC GAME LIVE SIGNAL 🚀\n\n💰 Game: Crash\n📈 Prediction: Cashout @ 2.10x\n✅ Safe Mode: 1.50x\n\n👉 Link: https://bcgame.com"
+            await bot.send_message(chat_id=CHAT_ID, text=message)
+            print("Signal Sent")
         except Exception as e:
             print(e)
-            time.sleep(2)
+        await asyncio.sleep(60) # 60 second por por signal jabe
 
-Thread(target=bot_loop, daemon=True).start()
+def run_flask():
+    app.run(host='0.0.0.0', port=10000)
 
 if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 10000)))
+    # Flask ke alada thread e chalabe jate Render ON thake
+    threading.Thread(target=run_flask).start()
+    asyncio.run(send_signal())
