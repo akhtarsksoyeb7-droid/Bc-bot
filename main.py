@@ -1,75 +1,83 @@
-from flask import Flask
-from threading import Thread
-import os, time, requests
+import os
+import random
+import asyncio
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
 
-app = Flask('')
-@app.route('/')
-def home(): return "BC.Game 5s Bot Live"
+# Token Render er Environment Variable theke asbe - Git e token dibi na
+BOT_TOKEN = os.getenv("BOT_TOKEN")
 
-BOT_TOKEN = os.environ.get("BOT_TOKEN")
-CHAT_ID = os.environ.get("CHAT_ID")
+# Demo Balance - Real taka na
+user_balance = {}
 
-def send_telegram(text):
-    try:
-        url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-        requests.post(url, json={"chat_id": CHAT_ID, "text": text}, timeout=10)
-    except Exception as e:
-        print(f"TG Error: {e}")
+# Demo Crash Logic - Asol Aviator er moto 80% dekhte same, kintu server logic na
+def get_crash_point():
+    # 90% somoy 1.1x - 5x er moddhe crash, 10% somoy boro
+    r = random.random()
+    if r < 0.9:
+        return round(random.uniform(1.1, 5.0), 2)
+    else:
+        return round(random.uniform(5.0, 50.0), 2)
 
-def get_price():
-    headers = {"User-Agent": "Mozilla/5.0"}
-    sources = [
-        ("bybit", "https://api.bybit.com/v5/market/tickers?category=spot&symbol=BTCUSDT", lambda j: float(j['result']['list'][0]['lastPrice'])),
-        ("okx", "https://www.okx.com/api/v5/market/ticker?instId=BTC-USDT", lambda j: float(j['data'][0]['last'])),
-        ("binance_vision", "https://data-api.binance.vision/api/v3/ticker/price?symbol=BTCUSDT", lambda j: float(j['price'])),
-        ("coinbase", "https://api.coinbase.com/v2/prices/BTC-USD/spot", lambda j: float(j['data']['amount'])),
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    if user_id not in user_balance:
+        user_balance[user_id] = 1000  # Demo coin
+    
+    keyboard = [
+        [InlineKeyboardButton("✈️ Demo Aviator Khelo", callback_data="play")],
+        [InlineKeyboardButton("💰 Balance Dekho", callback_data="balance")],
+        [InlineKeyboardButton("ℹ️ Info", callback_data="info")]
     ]
-    for name, url, parser in sources:
-        try:
-            r = requests.get(url, timeout=5, headers=headers)
-            if r.status_code == 200:
-                p = parser(r.json())
-                print(f"{name}: {p}")
-                return p
-        except Exception as e:
-            print(f"{name} fail")
-    return None
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    await update.message.reply_text(
+        f"Welcome Sidi Jojo Bhai! 👋\n\n"
+        f"Eta Aviator er DEMO bot. Kono real taka na.\n"
+        f"Tomar Demo Balance: {user_balance[user_id]} coin\n\n"
+        f"Niche Menu theke select koro:",
+        reply_markup=reply_markup
+    )
 
-def bot_loop():
-    send_telegram("BC.Game 5s Bot Started ✅\nBTC/USD tracking ON")
-    print("BOT STARTED 5s MODE")
+async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    user_id = query.from_user.id
+    
+    if query.data == "balance":
+        bal = user_balance.get(user_id, 1000)
+        await query.edit_message_text(f"Tomar Demo Balance: {bal} coin (Real taka na)")
 
-    while True:
-        try:
-            start_price = get_price()
-            if not start_price:
-                time.sleep(2)
-                continue
+    elif query.data == "info":
+        await query.edit_message_text(
+            "Eta ekta Educational Demo Bot.\n"
+            "Real Aviator er crash server side e hoy, eta keu hack korte pare na.\n"
+            "Eta sudhu dekhte kemon lage seta sekhar jonno.\n"
+            "18+ Only | No Real Money Involved"
+        )
 
-            print(f"START: {start_price}")
-            time.sleep(5) # BC.Game 5s game
+    elif query.data == "play":
+        crash_point = get_crash_point()
+        msg = await query.edit_message_text(f"✈️ Plane urche... 1.00x")
+        
+        multiplier = 1.0
+        while multiplier < crash_point:
+            multiplier += 0.15
+            multiplier = round(multiplier, 2)
+            try:
+                await msg.edit_text(f"✈️ Plane urche... {multiplier}x\n\nCashout korte /cashout likho")
+            except:
+                pass
+            await asyncio.sleep(0.3)
+        
+        await msg.edit_text(f"💥 CRASHED at {crash_point}x!\n\nAbar khelte /start dao.")
 
-            end_price = get_price()
-            if not end_price:
-                end_price = start_price
-
-            diff = end_price - start_price
-
-            if diff > 0:
-                msg = f"🟢 UP WIN ⬆️\nStart: {start_price:.2f}\nEnd: {end_price:.2f}\n+{diff:.2f}"
-            elif diff < 0:
-                msg = f"🔴 DOWN WIN ⬇️\nStart: {start_price:.2f}\nEnd: {end_price:.2f}\n{diff:.2f}"
-            else:
-                msg = f"⚪ SAME\n{start_price:.2f}"
-
-            print(msg)
-            send_telegram(msg)
-
-        except Exception as e:
-            print(f"Loop error: {e}")
-            time.sleep(2)
-
-Thread(target=bot_loop, daemon=True).start()
+def main():
+    app = Application.builder().token(BOT_TOKEN).build()
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CallbackQueryHandler(button_handler))
+    print("Bot Running...")
+    app.run_polling()
 
 if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 10000)))
+    main()
